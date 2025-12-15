@@ -71,3 +71,5 @@ stamp-*
 /gmp*
 /isl*
 /gettext*
+
+build/
