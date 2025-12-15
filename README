@@ -20,3 +20,17 @@ Copyright years on GCC source files may be listed using range
 notation, e.g., 1987-2012, indicating that every year in the range,
 inclusive, is a copyrightable year that could otherwise be listed
 individually.
+
+
+----- Compilation tutorial:
+
+1. Clone this repo and enter the folder
+
+2. ```
+mkdir build
+cd build
+../configure --target="i386-nocturne" --enable-languages="c" --disable-libssp --disable-libquadmath
+make -j$(nproc)
+```
+
+3. `sudo make install`
