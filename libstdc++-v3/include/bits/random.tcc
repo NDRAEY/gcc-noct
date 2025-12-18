@@ -915,9 +915,9 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     philox_engine<_UIntType, __w, __n, __r, __consts...>::
     _S_mulhi(_UIntType __a, _UIntType __b)
     {
-      const __uint128_t __num =
-	  static_cast<__uint128_t>(__a) * static_cast<__uint128_t>(__b);
-      return static_cast<_UIntType>((__num >> __w) & max());
+      using __type = typename __detail::_Select_uint_least_t<__w * 2>::type;
+      const __type __num = static_cast<__type>(__a) * __b;
+      return static_cast<_UIntType>(__num >> __w) & max();
     }
 
   template<typename _UIntType, size_t __w, size_t __n, size_t __r,
@@ -938,33 +938,34 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       if (_M_i != __n)
 	return;
 
+      using __type = typename __detail::_Select_uint_least_t<__w * 2>::type;
+
       _M_philox();
       if constexpr (__n == 4)
 	{
-	  __uint128_t __uh =
-	    (static_cast<__uint128_t>(_M_x[1]) << __w)
-		  | (static_cast<__uint128_t>(_M_x[0]) + 1);
-	  __uint128_t __lh =
-	    ((static_cast<__uint128_t>(_M_x[3]) << __w)
-		  | (_M_x[2]));
-	  __uint128_t __bigMask =
-	    (static_cast<__uint128_t>(1) << ((2 * __w) - 1))
-		  | ((static_cast<__uint128_t>(1) << ((2 * __w) - 1)) - 1);
+	  __type __uh
+	    = (static_cast<__type>(_M_x[1]) << __w)
+		| (static_cast<__type>(_M_x[0]) + 1);
+	  __type __lh
+	    = (static_cast<__type>(_M_x[3]) << __w)
+		| static_cast<__type>(_M_x[2]);
+	  __type __bigMask
+	    = ~__type(0) >> ((sizeof(__type) * __CHAR_BIT__) - (__w * 2));
 	  if ((__uh & __bigMask) == 0)
 	    {
 	      ++__lh;
 	      __uh = 0;
 	    }
-	  _M_x[0] = __uh & max();
-	  _M_x[1] = (__uh >> (__w)) & max();
-	  _M_x[2] = __lh & max();
-	  _M_x[3] = (__lh >> (__w)) & max();
+	  _M_x[0] = static_cast<_UIntType>(__uh & max());
+	  _M_x[1] = static_cast<_UIntType>((__uh >> (__w)) & max());
+	  _M_x[2] = static_cast<_UIntType>(__lh & max());
+	  _M_x[3] = static_cast<_UIntType>((__lh >> (__w)) & max());
 	}
       else
 	{
-	  __uint128_t __num =
-		  (static_cast<__uint128_t>(_M_x[1]) << __w)
-		  | (static_cast<__uint128_t>(_M_x[0]) + 1);
+	  __type __num =
+		  (static_cast<__type>(_M_x[1]) << __w)
+		  | (static_cast<__type>(_M_x[0]) + 1);
 	  _M_x[0] = __num & max();
 	  _M_x[1] = (__num >> __w) & max();
 	}
@@ -3619,17 +3620,12 @@ namespace __detail
   template <> const bool __is_rand_dist_float_v<long double> = true;
 #endif
 
-#ifdef __glibcxx_concepts
-# define _Uniform_random_bit_generator uniform_random_bit_generator
-#else
-# define _Uniform_random_bit_generator typename
-#endif
-
   // Note, this works even when (__range + 1) overflows:
   template <typename _Rng>
     constexpr bool __is_power_of_2_less_1(_Rng __range)
       { return ((__range + 1) & __range) == 0; };
 
+_GLIBCXX_BEGIN_INLINE_ABI_NAMESPACE(_V2)
   /** Produce a random floating-point value in the range [0..1)
    *
    * The result of `std::generate_canonical<RealT,digits>(urng)` is a
@@ -3646,12 +3642,15 @@ namespace __detail
    *  @since C++11
    */
   template<typename _RealT, size_t __digits,
-	_Uniform_random_bit_generator _Urbg>
+	   typename _Urbg>
     _RealT
     generate_canonical(_Urbg& __urng)
     {
+#ifdef __glibcxx_concepts
+      static_assert(uniform_random_bit_generator<_Urbg>);
+#endif      
       static_assert(__is_rand_dist_float_v<_RealT>,
-	"template argument must be floating point");
+	"template argument must be a floating point type");
       static_assert(__digits != 0 && _Urbg::max() > _Urbg::min(),
 	"random samples with 0 bits are not meaningful");
       static_assert(std::numeric_limits<_RealT>::radix == 2,
@@ -3677,7 +3676,7 @@ namespace __detail
 	    {
 #if defined(__SIZEOF_INT128__)
 	      // Accommodate double double or float128.
-	      return __generate_canonical_pow2<
+	      return __extension__ __generate_canonical_pow2<
 		_RealT, unsigned __int128, __d>(__urng);
 #else
 	      static_assert(false,
@@ -3694,7 +3693,7 @@ namespace __detail
 #if defined(__SIZEOF_INT128__)
 	      static_assert(__d <= 64,
 		"irregular RNG with float precision >64 is not supported");
-	      return __generate_canonical_any<
+	      return __extension__ __generate_canonical_any<
 		_RealT, unsigned __int128, __d>(__urng);
 #else
 	      static_assert(false, "irregular RNG with float precision"
@@ -3703,6 +3702,7 @@ namespace __detail
 	    }
 	}
     }
+_GLIBCXX_END_INLINE_ABI_NAMESPACE(_V2)
 
 #pragma GCC diagnostic pop
 
@@ -3736,12 +3736,14 @@ namespace __detail
 	}
       __ret = __sum / __tmp;
       if (__builtin_expect(__ret >= _RealType(1), 0))
+	{
 # if _GLIBCXX_USE_C99_MATH_FUNCS
 	  __ret = std::nextafter(_RealType(1), _RealType(0));
 # else
 	  __ret = _RealType(1)
 	    - std::numeric_limits<_RealType>::epsilon() / _RealType(2);
 # endif
+	}
       return __ret;
     }
 
