@@ -29,7 +29,7 @@ individually.
 2. ```
 mkdir build
 cd build
-../configure --target="i386-nocturne" --enable-languages="c" --disable-libssp --disable-libquadmath
+../configure --target="i386-nocturne" --enable-languages="c,c++,rust" --disable-libssp --disable-libquadmath --disable-tests --disable-bootstrap --disable-libstdcxx
 make -j$(nproc)
 ```
 
